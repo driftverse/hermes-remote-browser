@@ -108,7 +108,8 @@ One tool, `remote_browser`, with these actions:
 | `setup` | First-time checklist: relay status, port, extension folder, pairing |
 | `status` | Is a browser connected? |
 | `tabs` | List the tabs in the Hermes group |
-| `open` | Open a URL in a new Hermes-group tab (or reuse one: `new_tab: false` / `tab_id`) |
+| `focus` | Select an existing shared tab, expand its group and focus its window without navigating |
+| `open` | Open a URL (or reuse a shared tab); `foreground: true` brings it into view, default stays in background |
 | `snapshot` | Page title, URL, visible text and a numbered list of clickable/typeable elements |
 | `click` / `type` / `select` | Act on an element by its number from the latest snapshot |
 | `scroll` | `up` / `down` / `top` / `bottom`; optional `ref` targets an inner panel, reports whether it moved |
@@ -190,6 +191,23 @@ enter.
 - Some sites ignore scripted clicks/typing, and rich editors may not accept `type`.
 - `screenshot` brings the agent's tab to the front of its window.
 - Pages Chrome protects (`chrome://`, the Web Store) can't be scripted.
+
+## Foreground when useful (1.1.1)
+
+Tab focus is a per-action choice, not a site-name heuristic. Use `foreground: true` when opening
+chats, demonstrating something, or showing the user a result. Leave it false/omitted for quiet
+background research. Existing active tabs are not forcibly hidden by a background open.
+
+```json
+{"action":"open","url":"https://example.com/","foreground":true}
+{"action":"open","url":"https://example.com/","foreground":false}
+{"action":"focus","tab_id":123}
+```
+
+Foreground mode expands the shared tab group, activates the tab, restores a minimized window
+and requests window focus. It preserves normal/maximized state otherwise. `focus` only accepts
+shared tabs and never navigates. OS focus-stealing restrictions may still apply. Reload the
+extension and refresh the Hermes process/tool schema to use these options.
 
 ## Visible pointer and panel scrolling (1.1)
 

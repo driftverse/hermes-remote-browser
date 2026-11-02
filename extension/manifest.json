@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Hermes Remote Browser",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Lets your Hermes agent, running on another machine, use the tabs you put in the \"Hermes\" tab group. Off until you switch it on.",
   "minimum_chrome_version": "116",
   "permissions": [

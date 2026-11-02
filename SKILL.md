@@ -42,7 +42,7 @@ open, one at a time:
 
 ## Using it
 
-- `open` with a `url` puts a new tab in the Hermes group.
+- `open` with a `url` puts a new tab in the Hermes group. Set `foreground: true` for chats, demonstrations, or anything the user should see; leave it false/omitted for quiet background work. Choose based on task intent, not hardcoded site rules. `focus` with `tab_id` shows an existing shared tab without navigation. Neither option widens tab-group scope.
 - Then `snapshot` gives you the page text and numbered elements.
 - Then `click` / `type` / `select` with the element's `ref`.
 - `snapshot` again after anything changes the page, because refs change.

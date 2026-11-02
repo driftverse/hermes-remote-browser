@@ -202,6 +202,17 @@ function tabInfo(t) {
   return { tab_id: t.id, title: t.title, url: t.url, active: t.active };
 }
 
+async function focusTab(tabId) {
+  if (!(await local()).armed) throw new Error("Browser control switched off.");
+  const tab = await targetTab(tabId);
+  await chrome.tabGroups.update(tab.groupId, { collapsed: false });
+  await chrome.tabs.update(tab.id, { active: true });
+  const win = await chrome.windows.get(tab.windowId);
+  await chrome.windows.update(tab.windowId, { focused: true, ...(win.state === "minimized" ? { state: "normal" } : {}) });
+  await chrome.storage.local.set({ lastTabId: tab.id });
+  return tabInfo(await chrome.tabs.get(tab.id));
+}
+
 // ---- commands ----------------------------------------------------------------------------
 
 async function runCommand(action, p) {
@@ -210,6 +221,9 @@ async function runCommand(action, p) {
   switch (action) {
     case "tabs":
       return { tabs: (await agentTabs()).map(tabInfo) };
+
+    case "focus":
+      return focusTab(p.tab_id);
 
     case "open": {
       const url = String(p.url || "");
@@ -227,6 +241,7 @@ async function runCommand(action, p) {
       }
       await chrome.storage.local.set({ lastTabId: tab.id });
       await waitForLoad(tab.id);
+      if (p.foreground === true) return focusTab(tab.id);
       return tabInfo(await chrome.tabs.get(tab.id));
     }
 

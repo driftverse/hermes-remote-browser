@@ -40,7 +40,7 @@ PORT = int(os.environ.get("REMOTE_BROWSER_PORT", "9178"))
 TIMEOUT_S = 60
 
 ACTIONS = ["setup", "status", "pairing_requests", "approve_pairing", "tabs", "open", "snapshot", "click", "type", "select", "scroll", "key",
-           "back", "screenshot", "close", "mouse"]
+           "back", "screenshot", "close", "mouse", "focus"]
 
 DESCRIPTION = (
     "Use the Chrome browser on the user's own computer (their logged-in sessions) through the Hermes "
@@ -73,6 +73,7 @@ SCHEMA = {
             "url": {"type": "string", "description": "open: http(s) URL."},
             "code": {"type": "string", "description": "approve_pairing: code shown in the extension, e.g. ABC-123."},
             "tab_id": {"type": "integer", "description": "Tab to act on; defaults to the last one used."},
+            "foreground": {"type": "boolean", "description": "open: true selects tab, expands group and focuses window. Use true for chats, demos or anything the user should see; omit/false for background research. focus action selects an existing shared tab without navigation."},
             "new_tab": {"type": "boolean", "description": "open: false reuses the current Hermes-group tab."},
             "ref": {"type": "integer", "description": "click/type/select: latest snapshot ref. scroll: optional element/panel ref, targets nearest scrollable ancestor without clicking."},
             "text": {"type": "string", "description": "type: text to enter."},

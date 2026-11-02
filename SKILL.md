@@ -50,6 +50,10 @@ open, one at a time:
   `vision_analyze`. It brings that tab to the front of its window.
 - To work on a page the user already has open, ask them to drag that tab into the purple
   Hermes group, then use `tabs` to find it.
+- For inner panels, `scroll` with a fresh element/panel `ref`; verify `moved` and the next snapshot.
+- `mouse` kind `move`/`click`/`drag`/`wheel` sends browser input with a visible purple pointer. Use viewport CSS x/y; scale screenshots to their returned viewport dimensions. Drag uses `to_x`/`to_y`; wheel uses `delta_x`/`delta_y`. Verify the resulting snapshot; input dispatch is not proof of movement.
+- The pointer is a click-through overlay, not the OS cursor. It expires after 2.2 seconds. Never use mouse actions to evade credential restrictions or authorization requirements.
+- Mouse requires extension 1.1+ and its debugger permission; reload/re-enable the extension and start a fresh Hermes process if the tool schema is stale.
 - If a call says not connected, the user needs to switch the extension on. It switches itself
   off after a while and at every browser start.
 

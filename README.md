@@ -91,7 +91,9 @@ Done. Ask your agent to do something in your browser.
 - **Pairing without secrets.** The extension shows a short code that you approve on the server.
   The browser then holds a random device token; the server stores only its hash.
 - **Password fields are off-limits.** The extension refuses to read or type into them.
-- **No `debugger` permission.** Pages are driven with `chrome.scripting` and `chrome.tabs`.
+- **Real mouse input.** Version 1.1 adds Chrome's `debugger` permission for scoped mouse input.
+  Chrome shows a debugging notice while attached; it detaches after each action. Tab-group
+  restrictions are enforced in extension code, not by Chrome's broad permission scope.
 - **The relay runs itself.** The plugin starts `relay.py` in the background when Hermes loads it,
   using Hermes's own Python (it needs `aiohttp`, which Hermes already has). Only one relay runs
   per machine, and it keeps running across Hermes restarts. Paired browsers are kept in
@@ -109,7 +111,8 @@ One tool, `remote_browser`, with these actions:
 | `open` | Open a URL in a new Hermes-group tab (or reuse one: `new_tab: false` / `tab_id`) |
 | `snapshot` | Page title, URL, visible text and a numbered list of clickable/typeable elements |
 | `click` / `type` / `select` | Act on an element by its number from the latest snapshot |
-| `scroll` | `up` / `down` / `top` / `bottom` |
+| `scroll` | `up` / `down` / `top` / `bottom`; optional `ref` targets an inner panel, reports whether it moved |
+| `mouse` | Real `click` / `move` / `drag` / `wheel` at viewport CSS coordinates, with a visible purple pointer |
 | `key` | Press a key (Enter, Escape, Tab…) on the focused element |
 | `back` | Go back |
 | `screenshot` | Capture the tab (brings it to the front of its window) |
@@ -177,8 +180,9 @@ enter.
   (`devices.json`, mode 600).
 - Don't put an interactive login page (like Cloudflare Access) in front of the relay's hostname.
   The extension can't complete it. Pairing is the access control.
-- **Events are synthetic.** Clicks and typing come from page scripts, so pages see them as
-  scripted, not as real input. That's also why a few sites ignore them.
+- **Two input paths.** Ref-based clicks/typing are scripted and some sites ignore them. The
+  `mouse` action uses browser-level input through Chrome's debugger API. It does not move the
+  operating-system cursor; a click-through page overlay shows where the agent is acting.
 
 ## Limitations
 
@@ -186,6 +190,45 @@ enter.
 - Some sites ignore scripted clicks/typing, and rich editors may not accept `type`.
 - `screenshot` brings the agent's tab to the front of its window.
 - Pages Chrome protects (`chrome://`, the Web Store) can't be scripted.
+
+## Visible pointer and panel scrolling (1.1)
+
+The purple **Hermes** pointer marks mouse movement, dragging, clicks and scrolling. Clicks
+show a ring; scrolls show a direction arrow. It cannot intercept clicks or focus, stays out of
+snapshot text, and disappears after 2.2 seconds of inactivity. It is a visual indicator, not
+your desktop mouse. Fullscreen/top-layer elements or protected pages may hide it.
+
+```json
+{"action":"scroll","ref":42,"direction":"up","pixels":600}
+{"action":"mouse","kind":"wheel","x":700,"y":400,"delta_y":-600}
+{"action":"mouse","kind":"move","x":700,"y":400}
+{"action":"mouse","kind":"click","x":700,"y":400}
+{"action":"mouse","kind":"drag","x":300,"y":250,"to_x":600,"to_y":400}
+```
+
+Mouse x/y are **viewport CSS pixels**, not desktop coordinates or raw screenshot pixels.
+Screenshots include viewport width/height: scale image coordinates to those dimensions if the
+image is resized or HiDPI. Take a fresh snapshot after scrolling; refs can change and chat apps
+may load older messages lazily. `moved:false` means scrolling did not move; mouse wheel success
+means input was dispatched, so verify the resulting snapshot. No-ref scroll remains document-only.
+
+**Upgrade both sides.** Update the plugin and reload/re-enable the unpacked extension in
+`chrome://extensions`. Chrome may require approving the added debugger permission. Old Hermes
+processes may retain the old tool schema; start a fresh process/chat. No relay change is required.
+The source in `extension/` has this update; release downloads may lag until a new release is published.
+
+### Tests
+
+```bash
+node --test tests/input.test.cjs
+# Optional real isolated Chrome fixture; requires Chrome and Python websockets:
+python -m pip install websockets
+python tests/browser_test.py
+```
+
+Set `CHROME_BIN` if Chrome isn't on PATH. The fixture creates a disposable profile and never uses
+your personal Chrome. Command-level debugger mocks plus real Chrome protocol tests do not alone
+prove every site's behaviour; test the installed extension after reloading.
 
 ## Related projects
 

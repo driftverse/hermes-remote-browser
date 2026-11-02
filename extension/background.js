@@ -3,6 +3,8 @@
 // Chrome 116+ keeps a service worker alive while its websocket is active; the ping every 20s
 // is that activity.
 
+importScripts('cursor.js', 'mouse.js');
+
 const GROUP_TITLE = "Hermes";
 const AUTO_OFF_DEFAULT_MIN = 60;
 const PAGE_TIMEOUT_MS = 20000;
@@ -235,9 +237,22 @@ async function runCommand(action, p) {
       return { tab_id: tab.id, ...data };
     }
 
+    case "mouse": {
+      const tab = await targetTab(p.tab_id);
+      await chrome.storage.local.set({ lastTabId: tab.id });
+      const out = await mouseInput(tab, p);
+      await sleep(150);
+      return { ...out, ...tabInfo(await chrome.tabs.get(tab.id)) };
+    }
+
     case "click": case "type": case "select": case "scroll": case "key": {
       const tab = await targetTab(p.tab_id);
       await chrome.storage.local.set({ lastTabId: tab.id });
+      if (action === "click" || (action === "scroll" && p.ref !== undefined)) {
+        await showCursor(tab, { ...p, kind: action });
+      }
+      if (!(await local()).armed) throw new Error("Browser control switched off.");
+      await targetTab(tab.id);
       const out = await inPage(tab, pageAction, [action, p]);
       await sleep(700);
       await waitForLoad(tab.id);
@@ -263,7 +278,8 @@ async function runCommand(action, p) {
       // captureVisibleTab only sees the window's active tab, so bring the agent's tab forward.
       if (!tab.active) { await chrome.tabs.update(tab.id, { active: true }); await sleep(400); }
       const dataUrl = await chrome.tabs.captureVisibleTab(tab.windowId, { format: "jpeg", quality: 70 });
-      return { tab_id: tab.id, title: tab.title, url: tab.url, image: dataUrl };
+      const viewport = await inPage(tab, () => ({width:innerWidth,height:innerHeight,device_pixel_ratio:devicePixelRatio}));
+      return { tab_id: tab.id, title: tab.title, url: tab.url, viewport, coordinates: "viewport CSS pixels", image: dataUrl };
     }
 
     case "close": {
@@ -293,7 +309,9 @@ function pageSnapshot(maxChars) {
   const clip = (s, n) => (s || "").replace(/\s+/g, " ").trim().slice(0, n);
   const elements = [];
   let n = 0;
-  for (const el of document.querySelectorAll(SEL)) {
+  const scrollable = (el) => /(auto|scroll|overlay)/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight;
+  const candidates = new Set([...document.querySelectorAll(SEL), ...[...document.querySelectorAll('body *')].filter(el => visible(el) && scrollable(el))]);
+  for (const el of candidates) {
     if (n >= 300 || !visible(el)) continue;
     n += 1;
     el.setAttribute("data-hermes-ref", String(n));
@@ -313,6 +331,8 @@ function pageSnapshot(maxChars) {
     if (tag === "textarea" && el.value) item.value = clip(el.value, 60);
     if (tag === "select") item.value = clip(el.options[el.selectedIndex]?.text, 60);
     const r = el.getBoundingClientRect();
+    item.bounds = { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) };
+    if (scrollable(el)) item.scroll = { y: el.scrollTop, height: el.scrollHeight, viewport: el.clientHeight };
     if (r.bottom < 0 || r.top > innerHeight) item.offscreen = true;
     elements.push(item);
   }
@@ -332,11 +352,31 @@ function pageAction(action, p) {
     return el;
   };
   if (action === "scroll") {
-    const dy = { up: -1, down: 1 }[p.direction] ?? 1;
-    if (p.direction === "top") scrollTo(0, 0);
-    else if (p.direction === "bottom") scrollTo(0, document.documentElement.scrollHeight);
-    else scrollBy(0, dy * (Number(p.pixels) || Math.round(innerHeight * 0.8)));
-    return { scrolled: p.direction || "down", y: Math.round(scrollY) };
+    const root = document.scrollingElement || document.documentElement;
+    let target = root;
+    if (p.ref !== undefined) {
+      let el = document.querySelector(`[data-hermes-ref="${Number(p.ref)}"]`);
+      if (!el) return { error: `No element [${p.ref}]. Take a new snapshot.` };
+      while (el && el !== root) {
+        if (/(auto|scroll|overlay)/.test(getComputedStyle(el).overflowY) && el.scrollHeight > el.clientHeight) break;
+        el = el.parentElement;
+      }
+      target = el || root;
+    }
+    const direction = p.direction || "down";
+    if (!["up","down","top","bottom"].includes(direction)) return { error: "Invalid scroll direction." };
+    const distance = p.pixels ?? Math.round(target.clientHeight * 0.8);
+    if (!Number.isFinite(distance) || distance < 0) return { error: "Scroll distance must be nonnegative." };
+    const before = target.scrollTop;
+    // Column-reverse chat panels use negative scrollTop; zero is their bottom.
+    const reverse = getComputedStyle(target).flexDirection === "column-reverse";
+    const top = reverse ? target.clientHeight - target.scrollHeight : 0;
+    const bottom = reverse ? 0 : target.scrollHeight;
+    const next = direction === "top" ? top : direction === "bottom" ? bottom : before + (direction === "up" ? -distance : distance);
+    target.scrollTo({ top: next, behavior: "instant" });
+    const y = target.scrollTop;
+    return { scrolled: direction, y: Math.round(y), before: Math.round(before), moved: y !== before,
+      target: target === root ? "document" : "element", ref: p.ref, scroll_height: target.scrollHeight, viewport: target.clientHeight };
   }
   if (action === "key") {
     const el = document.activeElement || document.body;

@@ -40,7 +40,7 @@ PORT = int(os.environ.get("REMOTE_BROWSER_PORT", "9178"))
 TIMEOUT_S = 60
 
 ACTIONS = ["setup", "status", "pairing_requests", "approve_pairing", "tabs", "open", "snapshot", "click", "type", "select", "scroll", "key",
-           "back", "screenshot", "close"]
+           "back", "screenshot", "close", "mouse"]
 
 DESCRIPTION = (
     "Use the Chrome browser on the user's own computer (their logged-in sessions) through the Hermes "
@@ -68,18 +68,27 @@ SCHEMA = {
                 "user confirms on screen; only when the user asked you to pair). tabs: list Hermes-group tabs. open: load url (new tab "
                 "unless tab_id or new_tab=false). snapshot: text + numbered elements. click/type/select "
                 "by ref. scroll: direction up/down/top/bottom. key: press a key (Enter, Escape, Tab) on "
-                "the focused element. back. screenshot: image of the tab (brings it to front). close.")},
+                "the focused element. mouse: kind click/move/drag/wheel with viewport CSS x/y; drag needs to_x/to_y, wheel delta_x/delta_y. "
+                "Follow input with snapshot to verify. back. screenshot: image of the tab (brings it to front). close.")},
             "url": {"type": "string", "description": "open: http(s) URL."},
             "code": {"type": "string", "description": "approve_pairing: code shown in the extension, e.g. ABC-123."},
             "tab_id": {"type": "integer", "description": "Tab to act on; defaults to the last one used."},
             "new_tab": {"type": "boolean", "description": "open: false reuses the current Hermes-group tab."},
-            "ref": {"type": "integer", "description": "click/type/select: element number from the latest snapshot."},
+            "ref": {"type": "integer", "description": "click/type/select: latest snapshot ref. scroll: optional element/panel ref, targets nearest scrollable ancestor without clicking."},
             "text": {"type": "string", "description": "type: text to enter."},
             "clear": {"type": "boolean", "description": "type: replace existing text (default true)."},
             "submit": {"type": "boolean", "description": "type: press Enter / submit the form afterwards."},
             "value": {"type": "string", "description": "select: option value or visible text."},
             "direction": {"type": "string", "enum": ["up", "down", "top", "bottom"]},
             "pixels": {"type": "integer", "description": "scroll: distance (default ~one screen)."},
+            "kind": {"type": "string", "enum": ["click", "move", "drag", "wheel"], "description": "mouse: real browser mouse input with visible pointer; requires extension 1.1+."},
+            "x": {"type": "number", "description": "mouse: viewport CSS x, scale screenshot coordinates using viewport dimensions."},
+            "y": {"type": "number", "description": "mouse: viewport CSS y."},
+            "to_x": {"type": "number", "description": "mouse drag: destination CSS x."},
+            "to_y": {"type": "number", "description": "mouse drag: destination CSS y."},
+            "button": {"type": "string", "enum": ["left", "middle", "right"]},
+            "delta_x": {"type": "number", "description": "mouse wheel: horizontal CSS pixels."},
+            "delta_y": {"type": "number", "description": "mouse wheel: vertical CSS pixels, positive down. Verify actual movement with snapshot."},
             "key": {"type": "string", "description": "key: key name, e.g. Enter."},
             "max_chars": {"type": "integer", "description": "snapshot: page text limit (default 6000)."},
         },
